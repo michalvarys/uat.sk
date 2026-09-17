@@ -1,0 +1,6 @@
+[submodule "apps/frontend"]
+	path = apps/frontend
+	url = git@github.com:michalvarys/uat-frontend.git
+[submodule "apps/backend"]
+	path = apps/backend
+	url = git@github.com:michalvarys/uat-admin-v4.git

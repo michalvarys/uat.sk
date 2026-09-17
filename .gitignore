@@ -1,0 +1,12 @@
+# Konfigurace prostředí obsahuje hesla a klíče.
+env/*.env
+!env/example.env
+
+# Stav posledního nasazení (pro rollback) je lokální k serveru.
+.deploy-state-*
+
+# Zálohy do repozitáře nepatří.
+backups/
+*.sql
+*.sql.gz
+*.tar.gz

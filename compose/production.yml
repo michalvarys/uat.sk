@@ -1,0 +1,18 @@
+# Produkce — doplňuje base.yml.
+#
+# Liší se hlavně tím, co se NEDĚLÁ: žádné vystavené porty databáze,
+# žádné indexování vyhledávači navíc, konzervativnější restart.
+
+services:
+  postgresql:
+    # Databáze je dostupná jen uvnitř sítě. Přístup zvenčí jde přes
+    # `docker exec`, ne přes otevřený port.
+    ports: []
+
+  strapi:
+    environment:
+      NODE_ENV: production
+
+  frontend:
+    environment:
+      NODE_ENV: production

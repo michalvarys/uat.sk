@@ -1,0 +1,102 @@
+# Společný základ pro všechna prostředí.
+#
+# Nespouští se sám — vždy v kombinaci s overlayem prostředí:
+#   docker compose -f base.yml -f staging.yml ...
+#
+# Skripty v scripts/ to dělají za vás.
+
+networks:
+  internal:
+    name: uat-${ENVIRONMENT}-internal
+  proxy:
+    name: uat-proxy
+    external: true
+
+services:
+  postgresql:
+    image: bitnami/postgresql:14
+    container_name: uat-${ENVIRONMENT}-db
+    restart: unless-stopped
+    environment:
+      POSTGRESQL_USERNAME: ${POSTGRESQL_USER}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASS}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DB}
+    volumes:
+      - ${DATA_DIR}/db:/bitnami/postgresql
+    networks:
+      - internal
+    healthcheck:
+      # Ostatní služby čekají, až je databáze skutečně připravená —
+      # bez toho Strapi při startu občas spadne na nedostupné spojení.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRESQL_USER} -d ${POSTGRESQL_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges=true
+
+  strapi:
+    image: ${BACKEND_IMAGE:-varyshop/uat-admin}:${BACKEND_TAG:-latest}
+    container_name: uat-${ENVIRONMENT}-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_CLIENT: postgres
+      DATABASE_NAME: ${POSTGRESQL_DB}
+      DATABASE_HOST: postgresql
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${POSTGRESQL_USER}
+      DATABASE_PASSWORD: ${POSTGRESQL_PASS}
+      PORT: 1337
+      HOST: 0.0.0.0
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      API_TOKEN_SALT: ${API_TOKEN_SALT}
+      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
+      APP_KEYS: ${APP_KEYS}
+      STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE: sk
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - ${DATA_DIR}/uploads:/opt/app/public/uploads
+    networks:
+      - internal
+      - proxy
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=uat-proxy"
+      - "traefik.http.services.${ENVIRONMENT}-backend.loadbalancer.server.port=1337"
+      - "traefik.http.routers.${ENVIRONMENT}-backend.rule=Host(`${BE_DOMAIN}`)"
+      - "traefik.http.routers.${ENVIRONMENT}-backend.entrypoints=https"
+      - "traefik.http.routers.${ENVIRONMENT}-backend.tls=true"
+      - "traefik.http.routers.${ENVIRONMENT}-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${ENVIRONMENT}-backend.service=${ENVIRONMENT}-backend"
+    security_opt:
+      - no-new-privileges=true
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-varyshop/uat-frontend}:${FRONTEND_TAG:-latest}
+    container_name: uat-${ENVIRONMENT}-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      API_TOKEN: ${API_TOKEN}
+    networks:
+      - internal
+      - proxy
+    depends_on:
+      - strapi
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=uat-proxy"
+      - "traefik.http.services.${ENVIRONMENT}-frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.${ENVIRONMENT}-frontend.rule=Host(`${FE_DOMAIN}`)"
+      - "traefik.http.routers.${ENVIRONMENT}-frontend.entrypoints=https"
+      - "traefik.http.routers.${ENVIRONMENT}-frontend.tls=true"
+      - "traefik.http.routers.${ENVIRONMENT}-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${ENVIRONMENT}-frontend.service=${ENVIRONMENT}-frontend"
+    security_opt:
+      - no-new-privileges=true

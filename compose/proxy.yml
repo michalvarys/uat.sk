@@ -1,0 +1,46 @@
+# Sdílený reverzní proxy pro všechna prostředí.
+#
+# Běží samostatně, mimo prostředí — porty 80 a 443 může držet jen jeden
+# proces, takže produkce, staging i dev sdílejí jeden Traefik a liší se
+# doménami.
+#
+# Spouští se jednou při přípravě serveru:
+#   ./scripts/proxy.sh up
+
+networks:
+  proxy:
+    name: uat-proxy
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: uat-proxy
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      # Kontejner se zveřejní jen s explicitním traefik.enable=true,
+      # takže nic neuteče do internetu omylem.
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=uat-proxy
+      - --entrypoints.http.address=:80
+      - --entrypoints.https.address=:443
+      # Veškerý provoz na HTTP se překlápí na HTTPS.
+      - --entrypoints.http.http.redirections.entrypoint.to=https
+      - --entrypoints.http.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http
+      - --certificatesresolvers.letsencrypt.acme.email=${EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --accesslog=true
+      - --log.level=INFO
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Jen pro čtení — Traefik potřebuje vidět kontejnery, ne je měnit.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${PROXY_DATA_DIR:-./data/proxy}/letsencrypt:/letsencrypt
+    networks:
+      - proxy
+    security_opt:
+      - no-new-privileges=true
