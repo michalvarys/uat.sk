@@ -154,12 +154,12 @@ verify_dump() {
 }
 
 # Bitnami obraz PostgreSQL běží pod neprivilegovaným uživatelem
-# (UID 1000), ne pod rootem. Docker ale nově vytvořené složky zakládá
+# (UID 1001), ne pod rootem. Docker ale nově vytvořené složky zakládá
 # jako root, takže kontejner do nich nesmí zapisovat a start skončí
 # na "/bitnami/postgresql/data: permission denied".
 #
-# Uploady patří Strapi, který v obraze běží pod UID 1001.
-DB_UID=1000
+# Uploady patří Strapi, který v obraze běží rovněž pod UID 1001.
+DB_UID=1001
 DB_GID=0
 UPLOADS_UID=1001
 UPLOADS_GID=0

@@ -11,4 +11,5 @@ backups/
 *.sql.gz
 *.tar.gz
 public
+uploads
 db
