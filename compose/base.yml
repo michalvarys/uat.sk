@@ -15,7 +15,7 @@ networks:
 
 services:
   postgresql:
-    image: bitnami/postgresql:14
+    image: bitnami/postgresql@sha256:09cdb3fa309b4e6d361f88975d0298d09cb88954cf01e8c0187df4341291fd43
     container_name: uat-${ENVIRONMENT}-db
     restart: unless-stopped
     environment:
