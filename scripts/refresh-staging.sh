@@ -138,7 +138,7 @@ post_restore() {
     log_info "Startuji staging služby"
     run dc up -d
 
-    wait_for_http "Staging backend" "http://localhost:1337/admin" 40 || true
+    wait_for_http "Staging backend" "http://127.0.0.1:${BE_PORT}/admin" 40 || true
 }
 
 main

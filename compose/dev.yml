@@ -1,11 +1,11 @@
 # Dev — doplňuje base.yml.
 #
-# Nejvolnější prostředí: porty ven, žádná autentizace.
+# Nejvolnější prostředí: porty ven i pro databázi.
 
 services:
   postgresql:
     ports:
-      - "${POSTGRESQL_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRESQL_PORT:-5433}:5432"
 
   strapi:
     environment:
@@ -14,6 +14,3 @@ services:
   frontend:
     environment:
       NODE_ENV: production
-    labels:
-      - "traefik.http.middlewares.dev-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow"
-      - "traefik.http.routers.dev-frontend.middlewares=dev-noindex"

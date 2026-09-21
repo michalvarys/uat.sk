@@ -1,7 +1,6 @@
 # Produkce — doplňuje base.yml.
 #
-# Liší se hlavně tím, co se NEDĚLÁ: žádné vystavené porty databáze,
-# žádné indexování vyhledávači navíc, konzervativnější restart.
+# Liší se hlavně tím, co se NEDĚLÁ: databáze nemá port ven.
 
 services:
   postgresql:

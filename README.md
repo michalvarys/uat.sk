@@ -6,21 +6,23 @@ Běží tu tři prostředí vedle sebe: **produkce**, **staging** a **dev**.
 ## Jak to funguje
 
 ```
-                    ┌─────────────────────────────┐
-  uat.sk ─────────► │                             │ ──► produkce
-  staging.uat.sk ─► │   Traefik (porty 80, 443)   │ ──► staging
-  dev.uat.sk ─────► │                             │ ──► dev
-                    └─────────────────────────────┘
+                    ┌──────────────────────────┐
+  uat.sk ─────────► │                          │ ──► 127.0.0.1:3000
+  staging.uat.sk ─► │   nginx (aaPanel)        │ ──► 127.0.0.1:3001
+  dev.uat.sk ─────► │   + Let's Encrypt        │ ──► 127.0.0.1:3002
+                    └──────────────────────────┘
 ```
 
-Porty 80 a 443 může držet jen jeden proces, takže všechna prostředí
-sdílejí jeden Traefik a rozlišují se doménou. Každé prostředí má vlastní
-databázi, uploady, síť i jméno projektu, takže si navzájem nesahají
-na data.
+HTTPS a směrování podle domén řeší nginx spravovaný aaPanelem.
+Kontejnery poslouchají jen na localhostu a liší se porty — viz
+[docs/NGINX.md](docs/NGINX.md).
 
-Aplikace se **nestaví na serveru** — nasazují se hotové image z Docker
-Hubu. Zdrojové repozitáře jsou tu jako submodules jen kvůli přehledu
-a možnosti sáhnout do kódu.
+Každé prostředí má vlastní databázi, uploady, síť i jméno projektu,
+takže si navzájem nesahají na data.
+
+Aplikace se **nestaví na serveru** — nasazují se hotové image
+z GitHub Container Registry (`ghcr.io`). Zdrojové repozitáře jsou tu
+jako submodules jen kvůli přehledu a možnosti sáhnout do kódu.
 
 ## Struktura
 
@@ -28,9 +30,8 @@ a možnosti sáhnout do kódu.
 compose/
   base.yml          společný základ (databáze, Strapi, Next.js)
   production.yml    ⎫
-  staging.yml       ⎬ overlaye — domény, porty, odlišnosti
+  staging.yml       ⎬ overlaye — porty, odlišnosti
   dev.yml           ⎭
-  proxy.yml         sdílený Traefik
 
 scripts/
   lib.sh            sdílené funkce
@@ -40,7 +41,9 @@ scripts/
   backup.sh         záloha
   status.sh         přehled prostředí
   logs.sh           logy
-  proxy.sh          správa Traefiku
+
+docs/
+  NGINX.md          nastavení reverse proxy v aaPanelu
 
 env/
   example.env       šablona; skutečné *.env do gitu nepatří
@@ -62,17 +65,16 @@ cp env/example.env env/staging.env
 $EDITOR env/production.env   # domény, hesla, klíče
 
 # klíče pro Strapi: openssl rand -base64 32
-# heslo pro staging:  htpasswd -nb uzivatel heslo   (znak $ zdvojit na $$)
 
 mkdir -p /srv/uat/{production,staging}/{db,uploads}
 
-./scripts/proxy.sh up          # jednou, sdílený Traefik
-./scripts/deploy.sh --prod --tag v2.0.0
-./scripts/deploy.sh --staging
+./scripts/deploy.sh --prod --tag 2.0.0
+./scripts/deploy.sh --staging --tag 2.0.0
 ```
 
-**Než pustíte proxy**, musí mít všechny domény A záznam na tento server —
-Let's Encrypt jinak certifikát nevydá.
+Pak nastavte reverse proxy v aaPanelu podle [docs/NGINX.md](docs/NGINX.md).
+Domény musí mít A záznam na tento server, jinak Let's Encrypt
+certifikát nevydá.
 
 ## Běžná práce
 
@@ -130,7 +132,8 @@ Několik věcí je nastavených schválně:
 - **Produkční databáze nemá port ven.** Přístup jen přes `docker exec`.
   Staging a dev port mají, kvůli ladění.
 - **Staging je za heslem** a posílá `X-Robots-Tag: noindex` — nesmí
-  konkurovat produkci v vyhledávačích.
+  konkurovat produkci ve vyhledávačích. Nastavuje se v nginxu,
+  viz [docs/NGINX.md](docs/NGINX.md).
 - **Nasazení na produkci se ptá** a v neinteraktivním běhu skončí chybou,
   aby neproběhlo omylem ze skriptu nebo CI.
 - **Každé prostředí má vlastní klíče.** Produkční `APP_KEYS` a JWT

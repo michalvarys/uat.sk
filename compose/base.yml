@@ -4,13 +4,14 @@
 #   docker compose -f base.yml -f staging.yml ...
 #
 # Skripty v scripts/ to dělají za vás.
+#
+# HTTPS a směrování podle domén řeší nginx v aaPanelu. Kontejnery proto
+# poslouchají jen na localhostu; do internetu je pouští až reverse proxy
+# nastavená v panelu.
 
 networks:
   internal:
     name: uat-${ENVIRONMENT}-internal
-  proxy:
-    name: uat-proxy
-    external: true
 
 services:
   postgresql:
@@ -36,7 +37,7 @@ services:
       - no-new-privileges=true
 
   strapi:
-    image: ${BACKEND_IMAGE:-varyshop/uat-admin}:${BACKEND_TAG:-latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/michalvarys/uat-admin}:${BACKEND_TAG:-latest}
     container_name: uat-${ENVIRONMENT}-backend
     restart: unless-stopped
     environment:
@@ -48,6 +49,9 @@ services:
       DATABASE_PASSWORD: ${POSTGRESQL_PASS}
       PORT: 1337
       HOST: 0.0.0.0
+      # Strapi za reverse proxy musí znát svou veřejnou adresu, jinak
+      # generuje odkazy na localhost (např. v administraci a e-mailech).
+      URL: https://${BE_DOMAIN}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
       API_TOKEN_SALT: ${API_TOKEN_SALT}
@@ -57,26 +61,19 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - ${DATA_DIR}/uploads:/opt/app/public/uploads
+    ports:
+      # Vázáno na 127.0.0.1 — port není dostupný zvenčí, jen pro nginx.
+      - "127.0.0.1:${BE_PORT}:1337"
     networks:
       - internal
-      - proxy
     depends_on:
       postgresql:
         condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=uat-proxy"
-      - "traefik.http.services.${ENVIRONMENT}-backend.loadbalancer.server.port=1337"
-      - "traefik.http.routers.${ENVIRONMENT}-backend.rule=Host(`${BE_DOMAIN}`)"
-      - "traefik.http.routers.${ENVIRONMENT}-backend.entrypoints=https"
-      - "traefik.http.routers.${ENVIRONMENT}-backend.tls=true"
-      - "traefik.http.routers.${ENVIRONMENT}-backend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.${ENVIRONMENT}-backend.service=${ENVIRONMENT}-backend"
     security_opt:
       - no-new-privileges=true
 
   frontend:
-    image: ${FRONTEND_IMAGE:-varyshop/uat-frontend}:${FRONTEND_TAG:-latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/michalvarys/uat-frontend}:${FRONTEND_TAG:-latest}
     container_name: uat-${ENVIRONMENT}-frontend
     restart: unless-stopped
     environment:
@@ -84,19 +81,11 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       API_TOKEN: ${API_TOKEN}
+    ports:
+      - "127.0.0.1:${FE_PORT}:3000"
     networks:
       - internal
-      - proxy
     depends_on:
       - strapi
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=uat-proxy"
-      - "traefik.http.services.${ENVIRONMENT}-frontend.loadbalancer.server.port=3000"
-      - "traefik.http.routers.${ENVIRONMENT}-frontend.rule=Host(`${FE_DOMAIN}`)"
-      - "traefik.http.routers.${ENVIRONMENT}-frontend.entrypoints=https"
-      - "traefik.http.routers.${ENVIRONMENT}-frontend.tls=true"
-      - "traefik.http.routers.${ENVIRONMENT}-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.${ENVIRONMENT}-frontend.service=${ENVIRONMENT}-frontend"
     security_opt:
       - no-new-privileges=true

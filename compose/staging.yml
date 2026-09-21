@@ -1,14 +1,17 @@
 # Staging — doplňuje base.yml.
 #
-# Běží na stejném stroji jako produkce, oddělený jménem projektu,
-# sítí a datovou složkou.
+# Běží na stejném stroji jako produkce, oddělený jménem projektu, sítí,
+# datovou složkou a porty.
+#
+# Ochranu heslem a hlavičku noindex řeší nginx v aaPanelu, ne compose —
+# viz docs/NGINX.md.
 
 services:
   postgresql:
     # Port ven kvůli ladění a nahrávání záloh z lokálu.
     # Na produkci schválně chybí.
     ports:
-      - "${POSTGRESQL_PORT:-5434}:5432"
+      - "127.0.0.1:${POSTGRESQL_PORT:-5434}:5432"
 
   strapi:
     environment:
@@ -17,11 +20,3 @@ services:
   frontend:
     environment:
       NODE_ENV: production
-    labels:
-      # Staging nesmí do vyhledávačů — jinak by konkuroval produkci
-      # duplicitním obsahem.
-      - "traefik.http.middlewares.staging-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow"
-      - "traefik.http.routers.staging-frontend.middlewares=staging-noindex,staging-auth"
-      # Základní ochrana heslem, ať se na staging nedostane kdokoli.
-      # Hash vygenerujete: htpasswd -nb uzivatel heslo
-      - "traefik.http.middlewares.staging-auth.basicauth.users=${STAGING_AUTH:-}"

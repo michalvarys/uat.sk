@@ -76,8 +76,8 @@ main() {
         [[ $rc -eq 2 ]] && exit 0 || exit $rc
     }
 
-    tag_and_push "$stage_fe" "varyshop/uat-frontend:$NEW_TAG"
-    tag_and_push "$stage_be" "varyshop/uat-admin:$NEW_TAG"
+    tag_and_push "$stage_fe" "ghcr.io/michalvarys/uat-frontend:$NEW_TAG"
+    tag_and_push "$stage_be" "ghcr.io/michalvarys/uat-admin:$NEW_TAG"
 
     log_step "Nasazuji na produkci"
     run "$REPO_ROOT/scripts/deploy.sh" --prod --tag "$NEW_TAG"

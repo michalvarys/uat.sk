@@ -28,9 +28,15 @@ for e in production staging dev; do
           fi
       done
 
+      # Kontejner i veřejná adresa zvlášť: když kontejner odpovídá
+      # a doména ne, chyba je v nginxu, ne v aplikaci.
+      if [[ -n "${FE_PORT:-}" ]]; then
+          local_code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:${FE_PORT}/" 2>/dev/null || echo '---')"
+          printf "  kontejner: %s\n" "$local_code"
+      fi
       if [[ -n "${FE_DOMAIN:-}" ]]; then
           code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 "https://${FE_DOMAIN}/" 2>/dev/null || echo '---')"
-          printf "  web: %s\n" "$code"
+          printf "  web:       %s\n" "$code"
       fi
       echo
     )

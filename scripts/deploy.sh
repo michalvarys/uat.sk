@@ -126,7 +126,7 @@ pull_and_up() {
     # by zbytečně logoval chyby.
     if $DO_BACKEND; then
         run dc up -d --force-recreate strapi
-        wait_for_http "Backend" "http://localhost:1337/admin" 40 || true
+        wait_for_http "Backend" "http://127.0.0.1:${BE_PORT}/admin" 40 || true
     fi
 
     $DO_FRONTEND && run dc up -d --force-recreate frontend
@@ -139,12 +139,14 @@ verify() {
     local failed=false
 
     if $DO_FRONTEND && ! $DRY_RUN; then
-        wait_for_http "Frontend" "https://${FE_DOMAIN}/" 40 || failed=true
+        # Ověřuje se přímo kontejner, ne veřejná doména: nasazení má
+        # projít i dřív, než je v aaPanelu hotová reverse proxy.
+        wait_for_http "Frontend" "http://127.0.0.1:${FE_PORT}/" 40 || failed=true
 
         # Kontrola, že se obsah renderuje na serveru. Prázdná slupka
         # vrací 200, ale pro vyhledávače je bezcenná.
         local h1
-        h1="$(curl -s -m 15 "https://${FE_DOMAIN}/" 2>/dev/null | grep -c '<h1' || echo 0)"
+        h1="$(curl -s -m 15 "http://127.0.0.1:${FE_PORT}/" 2>/dev/null | grep -c '<h1' || echo 0)"
         if [[ "$h1" -ge 1 ]]; then
             log_info "Server-side rendering funguje."
         else
