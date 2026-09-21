@@ -136,6 +136,7 @@ post_restore() {
     log_info "Administrátorské účty zůstávají z produkce (staging je za heslem)."
 
     log_info "Startuji staging služby"
+    prepare_data_dirs || true
     run dc up -d
 
     wait_for_http "Staging backend" "http://127.0.0.1:${BE_PORT}/admin" 40 || true

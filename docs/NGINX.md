@@ -119,5 +119,12 @@ z `BE_DOMAIN`, takže zkontrolujte `env/<prostředí>.env`.
 **Nahrání souboru skončí chybou 413**
 Chybí `client_max_body_size` v konfiguraci backendu.
 
+**Databáze nenaběhne: `/bitnami/postgresql/data: permission denied`**
+Datová složka patří rootovi, ale kontejner běží pod UID 1000.
+Řeší to `deploy.sh` sám; ručně:
+```bash
+chown -R 1000:0 /srv/uat/staging/db
+```
+
 **Let's Encrypt nevydá certifikát**
 Doména nemá A záznam na tento server, nebo port 80 neodpovídá.

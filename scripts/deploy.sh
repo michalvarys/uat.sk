@@ -59,6 +59,10 @@ main() {
         }
     fi
 
+    # Složky musí existovat a patřit správnému uživateli dřív, než
+    # se kontejnery spustí — jinak databáze skončí na permission denied.
+    prepare_data_dirs || exit 1
+
     backup_first
     remember_current
     pull_and_up

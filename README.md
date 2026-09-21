@@ -66,7 +66,11 @@ $EDITOR env/production.env   # domény, hesla, klíče
 
 # klíče pro Strapi: openssl rand -base64 32
 
-mkdir -p /srv/uat/{production,staging}/{db,uploads}
+# Datové složky vytvoří a nastaví deploy.sh sám. Ručně jen tehdy,
+# když skript neběží pod rootem:
+#   mkdir -p /srv/uat/{production,staging}/{db,uploads}
+#   chown -R 1000:0 /srv/uat/*/db        # PostgreSQL běží pod UID 1000
+#   chown -R 1001:0 /srv/uat/*/uploads   # Strapi pod UID 1001
 
 ./scripts/deploy.sh --prod --tag 2.0.0
 ./scripts/deploy.sh --staging --tag 2.0.0

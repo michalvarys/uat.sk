@@ -153,6 +153,51 @@ verify_dump() {
     log_info "Záloha ověřena ($(du -h "$file" | cut -f1))."
 }
 
+# Bitnami obraz PostgreSQL běží pod neprivilegovaným uživatelem
+# (UID 1000), ne pod rootem. Docker ale nově vytvořené složky zakládá
+# jako root, takže kontejner do nich nesmí zapisovat a start skončí
+# na "/bitnami/postgresql/data: permission denied".
+#
+# Uploady patří Strapi, který v obraze běží pod UID 1001.
+DB_UID=1000
+DB_GID=0
+UPLOADS_UID=1001
+UPLOADS_GID=0
+
+prepare_data_dirs() {
+    [[ -n "${DATA_DIR:-}" ]] || { log_error "Není nastaveno DATA_DIR."; return 1; }
+
+    log_info "Připravuji datové složky v $DATA_DIR"
+
+    run mkdir -p "$DATA_DIR/db" "$DATA_DIR/uploads"
+
+    if $DRY_RUN; then
+        echo -e "   ${YELLOW}[dry-run]${NC} chown $DB_UID:$DB_GID $DATA_DIR/db"
+        echo -e "   ${YELLOW}[dry-run]${NC} chown $UPLOADS_UID:$UPLOADS_GID $DATA_DIR/uploads"
+        return 0
+    fi
+
+    # Vlastníka lze měnit jen jako root. Bez oprávnění se jen upozorní,
+    # aby skript nespadl tam, kde práva už sedí.
+    if [[ "$(stat -c '%u' "$DATA_DIR/db")" != "$DB_UID" ]]; then
+        if ! chown -R "$DB_UID:$DB_GID" "$DATA_DIR/db" 2>/dev/null; then
+            log_warn "Nelze nastavit vlastníka $DATA_DIR/db — spusťte:"
+            echo    "    sudo chown -R $DB_UID:$DB_GID $DATA_DIR/db"
+            return 1
+        fi
+    fi
+
+    if [[ "$(stat -c '%u' "$DATA_DIR/uploads")" != "$UPLOADS_UID" ]]; then
+        if ! chown -R "$UPLOADS_UID:$UPLOADS_GID" "$DATA_DIR/uploads" 2>/dev/null; then
+            log_warn "Nelze nastavit vlastníka $DATA_DIR/uploads — spusťte:"
+            echo    "    sudo chown -R $UPLOADS_UID:$UPLOADS_GID $DATA_DIR/uploads"
+            return 1
+        fi
+    fi
+
+    log_info "Složky připraveny."
+}
+
 wait_for_http() {
     local name="$1" url="$2" tries="${3:-40}"
 
