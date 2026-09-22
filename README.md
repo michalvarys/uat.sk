@@ -39,6 +39,7 @@ scripts/
   promote.sh        staging → produkce
   refresh-staging.sh  staging z produkčních dat
   backup.sh         záloha
+  sync-tag.sh       sjednocení verzí přeznačením
   status.sh         přehled prostředí
   logs.sh           logy
 
@@ -101,9 +102,28 @@ Promote odešle **bitově shodný image**, jaký běžel na stagingu — jen ho
 přeznačí. Produkce tak dostane přesně to, co prošlo testem, ne nový
 build ze stejného tagu.
 
+### Když se jedna aplikace nezměnila
+
+Aplikace se vydávají zvlášť, takže verze nemusí existovat u obou —
+nasazení by jinak skončilo na `manifest unknown`. `deploy.sh` to řeší sám:
+chybějící image přeznačí z poslední dostupné verze, aby obě služby běžely
+pod jedním číslem.
+
+Děje se to **jen lokálně**, do registru se nic neodesílá. Ručně:
+
+```bash
+./scripts/sync-tag.sh 2.1.0 --from 2.0.0    # doplní chybějící
+./scripts/sync-tag.sh 2.1.0 --push          # navíc odešle do registru
+```
+
+Přeznačený image nese kód ze zdrojové verze, takže git tag na něj
+neukazuje. Pro přehled o tom, co v produkci běží, je lepší tagovat
+oba repozitáře — přeznačení je pohodlná zkratka, ne náhrada.
+
 ### Další
 
 ```bash
+./scripts/sync-tag.sh --check 2.1.0        # mají obě aplikace tuto verzi?
 ./scripts/status.sh                        # co kde běží
 ./scripts/logs.sh --prod strapi            # logy backendu
 ./scripts/backup.sh --prod                 # ruční záloha

@@ -6,6 +6,7 @@
 #   ./scripts/deploy.sh --staging                    # staging, tag latest
 #   ./scripts/deploy.sh --staging --tag v2.0.0
 #   ./scripts/deploy.sh --prod --tag v2.0.0          # produkce (ptá se)
+#   ./scripts/deploy.sh --staging --tag-frontend 2.0.1   # jen frontend jinak
 #   ./scripts/deploy.sh --staging --frontend         # jen frontend
 #   ./scripts/deploy.sh --prod --rollback            # předchozí verze
 #   ./scripts/deploy.sh --staging --dry-run
@@ -19,6 +20,8 @@ DO_BACKEND=true
 DO_BACKUP=true
 ROLLBACK=false
 TAG=""
+TAG_FRONTEND=""
+TAG_BACKEND=""
 
 parse_common_args "$@"
 set -- "${REMAINING_ARGS[@]+"${REMAINING_ARGS[@]}"}"
@@ -28,6 +31,8 @@ while [[ $# -gt 0 ]]; do
         --frontend)    DO_BACKEND=false; shift ;;
         --backend)     DO_FRONTEND=false; shift ;;
         --tag)         TAG="$2"; shift 2 ;;
+        --tag-frontend) TAG_FRONTEND="$2"; shift 2 ;;
+        --tag-backend)  TAG_BACKEND="$2"; shift 2 ;;
         --skip-backup) DO_BACKUP=false; shift ;;
         --rollback)    ROLLBACK=true; shift ;;
         -h|--help)     sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -112,17 +117,62 @@ remember_current() {
     } > "$STATE_FILE"
 }
 
+# Holé "manifest unknown" z Dockeru neřekne, který image chybí ani proč.
+#
+# Když aplikace nemá image v požadované verzi (typicky proto, že se
+# nezměnila a netagovala se), přeznačí se poslední dostupná verze —
+# obě služby pak běží pod jedním číslem a nemusí se hlídat zvlášť.
+# Děje se to jen lokálně, do registru se nic neodesílá.
+pull_checked() {
+    local image="$1" label="$2"
+
+    if $DRY_RUN; then
+        echo -e "   ${YELLOW}[dry-run]${NC} docker pull $image"
+        return 0
+    fi
+
+    if docker pull "$image" 2>/dev/null; then
+        return 0
+    fi
+
+    # Image v registru není — zkusíme ho doplnit přeznačením.
+    local repo="${image%:*}" want="${image##*:}"
+    local fallback
+    fallback="$(docker images "$repo" --format '{{.Tag}}' 2>/dev/null \
+        | grep -vE '^(latest|<none>)$' | sort -Vr | head -1)"
+
+    if [[ -n "$fallback" ]]; then
+        log_warn "$label nemá verzi $want — přeznačuji z $fallback."
+        docker tag "$repo:$fallback" "$image" && {
+            log_info "Hotovo: $image (kód z verze $fallback)"
+            return 0
+        }
+    fi
+
+    log_error "Image pro $label neexistuje: $image"
+    log_warn  "Ověřte, že build pro tuto verzi proběhl:"
+    echo     "    https://github.com/michalvarys/uat-${label/backend/admin-v4}/actions"
+    log_warn  "Nebo doplňte verzi ručně:"
+    echo     "    ./scripts/sync-tag.sh $want --from <existující verze>"
+    exit 1
+}
+
 pull_and_up() {
     log_step "Stahuji image"
 
-    # Tag z příkazové řádky přebíjí hodnotu v env souboru.
-    if [[ -n "$TAG" ]]; then
-        export FRONTEND_TAG="$TAG"
-        export BACKEND_TAG="$TAG"
-    fi
+    # Tag z příkazové řádky přebíjí hodnotu v env souboru. --tag platí pro
+    # obě služby, --tag-frontend/--tag-backend jen pro jednu — aplikace
+    # se často vydávají zvlášť a ne každá verze existuje u obou.
+    [[ -n "$TAG" ]] && { export FRONTEND_TAG="$TAG"; export BACKEND_TAG="$TAG"; }
+    [[ -n "$TAG_FRONTEND" ]] && export FRONTEND_TAG="$TAG_FRONTEND"
+    [[ -n "$TAG_BACKEND"  ]] && export BACKEND_TAG="$TAG_BACKEND"
 
-    $DO_BACKEND  && run docker pull "${BACKEND_IMAGE:-varyshop/uat-admin}:${BACKEND_TAG:-latest}"
-    $DO_FRONTEND && run docker pull "${FRONTEND_IMAGE:-varyshop/uat-frontend}:${FRONTEND_TAG:-latest}"
+    local be_image fe_image
+    be_image="${BACKEND_IMAGE:-ghcr.io/michalvarys/uat-admin}:${BACKEND_TAG:-latest}"
+    fe_image="${FRONTEND_IMAGE:-ghcr.io/michalvarys/uat-frontend}:${FRONTEND_TAG:-latest}"
+
+    $DO_BACKEND  && pull_checked "$be_image" "backend"
+    $DO_FRONTEND && pull_checked "$fe_image" "frontend"
 
     log_step "Startuji služby"
 
