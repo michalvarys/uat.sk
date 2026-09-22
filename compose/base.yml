@@ -80,6 +80,14 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      # Adresy se předávají za běhu, ne při buildu — díky tomu obslouží
+      # tentýž image staging i produkci. Bez nich by frontend četl
+      # z výchozí (produkční) databáze.
+      API_URL: https://${BE_DOMAIN}
+      BASE_URL: https://${FE_DOMAIN}/cms
+      SITE_URL: https://${FE_DOMAIN}
+      FRONTEND_DOMAIN: ${FE_DOMAIN}
+      BACKEND_DOMAIN: ${BE_DOMAIN}
       API_TOKEN: ${API_TOKEN}
     ports:
       - "127.0.0.1:${FE_PORT}:3000"
