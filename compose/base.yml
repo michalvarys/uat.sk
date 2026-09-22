@@ -81,9 +81,14 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       # Adresy se předávají za běhu, ne při buildu — díky tomu obslouží
-      # tentýž image staging i produkci. Bez nich by frontend četl
-      # z výchozí (produkční) databáze.
-      API_URL: https://${BE_DOMAIN}
+      # tentýž image staging i produkci.
+      #
+      # Server volá Strapi vnitřní sítí Dockeru: je to stejné pro každé
+      # prostředí, nezávisí to na doméně ani na certifikátu a provoz
+      # neopouští stroj. Veřejná adresa zůstává jen pro odkazy
+      # na obrázky, které skládá prohlížeč.
+      API_URL: http://strapi:1337
+      PUBLIC_API_URL: https://${BE_DOMAIN}
       BASE_URL: https://${FE_DOMAIN}/cms
       SITE_URL: https://${FE_DOMAIN}
       FRONTEND_DOMAIN: ${FE_DOMAIN}

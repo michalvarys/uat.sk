@@ -141,12 +141,17 @@ pull_checked() {
     fallback="$(docker images "$repo" --format '{{.Tag}}' 2>/dev/null \
         | grep -vE '^(latest|<none>)$' | sort -Vr | head -1)"
 
-    if [[ -n "$fallback" ]]; then
+    # Rovnost by znamenala, že image je lokálně a jen se nestáhl —
+    # hlásit "přeznačuji z 2.0.2 na 2.0.2" by mátlo.
+    if [[ -n "$fallback" && "$fallback" != "$want" ]]; then
         log_warn "$label nemá verzi $want — přeznačuji z $fallback."
         docker tag "$repo:$fallback" "$image" && {
             log_info "Hotovo: $image (kód z verze $fallback)"
             return 0
         }
+    elif [[ "$fallback" == "$want" ]]; then
+        log_info "$label: verze $want je už lokálně."
+        return 0
     fi
 
     log_error "Image pro $label neexistuje: $image"
@@ -199,8 +204,11 @@ verify() {
 
         # Kontrola, že se obsah renderuje na serveru. Prázdná slupka
         # vrací 200, ale pro vyhledávače je bezcenná.
+        # grep -c na prázdném vstupu vrací nenulový kód a `|| echo 0`
+        # pak přilepí druhý řádek — porovnání níž na tom padalo.
         local h1
-        h1="$(curl -s -m 15 "http://127.0.0.1:${FE_PORT}/" 2>/dev/null | grep -c '<h1' || echo 0)"
+        h1="$(curl -s -m 15 "http://127.0.0.1:${FE_PORT}/" 2>/dev/null | grep -c '<h1' | head -1 | tr -cd '0-9')"
+        h1="${h1:-0}"
         if [[ "$h1" -ge 1 ]]; then
             log_info "Server-side rendering funguje."
         else
