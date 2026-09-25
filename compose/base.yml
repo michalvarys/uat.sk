@@ -85,10 +85,17 @@ services:
       #
       # Server volá Strapi vnitřní sítí Dockeru: je to stejné pro každé
       # prostředí, nezávisí to na doméně ani na certifikátu a provoz
-      # neopouští stroj. Veřejná adresa zůstává jen pro odkazy
-      # na obrázky, které skládá prohlížeč.
+      # neopouští stroj.
       API_URL: http://strapi:1337
-      PUBLIC_API_URL: https://${BE_DOMAIN}
+
+      # PUBLIC_API_URL se schválně nenastavuje — frontend si doplní
+      # relativní /cms, které middleware přepošle na Strapi.
+      #
+      # S absolutní adresou (https://cms-staging.uat.sk/...) vracel
+      # optimalizátor obrázků 400 "url parameter is not allowed":
+      # povolené domény se do images.remotePatterns zapékají při buildu
+      # v CI, kde doména prostředí není známá. Relativní cesta je
+      # lokální, žádné povolení nepotřebuje a platí pro obě prostředí.
       BASE_URL: https://${FE_DOMAIN}/cms
       SITE_URL: https://${FE_DOMAIN}
       FRONTEND_DOMAIN: ${FE_DOMAIN}
