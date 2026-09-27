@@ -101,6 +101,12 @@ services:
       FRONTEND_DOMAIN: ${FE_DOMAIN}
       BACKEND_DOMAIN: ${BE_DOMAIN}
       API_TOKEN: ${API_TOKEN}
+
+      # Sdílené tajemství pro /api/revalidate. Strapi na ten endpoint
+      # zavolá po uložení obsahu a stránka se přegeneruje hned, místo
+      # aby se čekalo na vypršení cache. Bez nastavené hodnoty endpoint
+      # nic neobslouží — jinak by šel volat anonymně.
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET}
     ports:
       - "127.0.0.1:${FE_PORT}:3000"
     networks:
