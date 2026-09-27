@@ -57,6 +57,16 @@ services:
       API_TOKEN_SALT: ${API_TOKEN_SALT}
       TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
       APP_KEYS: ${APP_KEYS}
+
+      # Kam Strapi po uložení obsahu zavolá, aby se stránka přegenerovala.
+      # Webhook si založí sama při startu (src/bootstrap/revalidate-webhook.ts),
+      # takže se nemusí nastavovat ručně a přežije i obnovení prostředí
+      # ze zálohy, kde by jinak zůstal webhook původního prostředí.
+      #
+      # Míří na vnitřní jméno služby: provoz neopouští stroj a nezávisí
+      # na doméně ani certifikátu.
+      REVALIDATE_URL: http://frontend:3000/api/revalidate
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET}
       STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE: sk
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
