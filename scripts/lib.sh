@@ -118,6 +118,13 @@ parse_common_args() {
 
 db_container() { echo "uat-$ENVIRONMENT-db"; }
 
+# Běží databáze? Rozlišuje první instalaci od výpadku: při prvním
+# spuštění prostředí ještě žádný kontejner neexistuje, takže není co
+# zálohovat ani z čeho obnovovat.
+db_is_running() {
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$(db_container)"
+}
+
 # Dump jde přes kontejner, takže na hostiteli není potřeba psql.
 pg_dump_to() {
     local target="$1"

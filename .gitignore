@@ -13,3 +13,5 @@ backups/
 public
 uploads
 db
+.production
+.staging

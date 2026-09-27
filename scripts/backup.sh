@@ -42,7 +42,7 @@ main() {
 
     run mkdir -p "$BACKUP_DIR"
 
-    if ! docker ps --format '{{.Names}}' | grep -qx "$(db_container)"; then
+    if ! db_is_running; then
         log_error "Databázový kontejner $(db_container) neběží."
         exit 1
     fi

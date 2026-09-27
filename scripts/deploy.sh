@@ -91,6 +91,14 @@ backup_first() {
         return
     fi
 
+    # První spuštění prostředí: databáze ještě neexistuje, takže není
+    # co zálohovat. Vynucovat zálohu tady by znamenalo, že produkci
+    # nejde vůbec poprvé nasadit.
+    if ! db_is_running; then
+        log_warn "Databáze zatím neběží — první spuštění, zálohu přeskakuji."
+        return
+    fi
+
     log_step "Záloha před nasazením"
     if $DRY_RUN; then
         echo -e "   ${YELLOW}[dry-run]${NC} ./scripts/backup.sh --prod"
@@ -233,6 +241,13 @@ rollback() {
     # shellcheck disable=SC1090
     source "$STATE_FILE"
     log_info "Uložený stav z: ${SAVED_AT:-?}"
+
+    # Po prvním nasazení je stav prázdný — předchozí verze neexistuje.
+    # Bez téhle větve by skript tiše neudělal nic a ohlásil „Hotovo".
+    if [[ -z "${FRONTEND_PREV:-}" && -z "${BACKEND_PREV:-}" ]]; then
+        log_error "Uložený stav je prázdný — tohle bylo první nasazení, není kam se vrátit."
+        exit 1
+    fi
 
     [[ -n "${BACKEND_PREV:-}" ]] && {
         log_info "Backend → $BACKEND_PREV"
