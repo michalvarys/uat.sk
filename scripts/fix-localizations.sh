@@ -16,10 +16,11 @@
 # Co se páruje a podle čeho:
 #   obory       podle kódu oboru (code) — spolehlivé, kód je stejný
 #   pedagogové  podle jména a příjmení — 28 dvojic, žádná víceznačná
+#   stránky     podle ručně vyjmenovaných dvojic — slugy jsou přeložené,
+#               takže je nemá co spojit automaticky
 #
-# Stránky, novinky a akce se nepárují: slugy i názvy jsou přeložené
-# a žádný společný klíč neexistuje. Ty je potřeba propojit ručně
-# v administraci.
+# Novinky a akce se nepárují: názvy jsou přeložené a překladů je málo
+# (2 anglické novinky z 526). Ty je potřeba propojit ručně.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
@@ -88,6 +89,41 @@ SELECT en_id, sk_id FROM parovani WHERE en_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 "
 
+# Stránky nemají společný klíč — slugy jsou přeložené, takže dvojice
+# musí být vyjmenované ručně. Páruje se podle slugu, ne id: ta se mezi
+# prostředími liší, slug je stabilní.
+#
+# Dvojice vznikly porovnáním názvů; 13 anglických stránek pokrývá
+# všechny, které v angličtině existují.
+SQL_PAGES="
+WITH dvojice(sk_slug, en_slug) AS (VALUES
+    ('talentove-skusky',                              'talent-exam'),
+    ('kronika',                                       'chronicles'),
+    ('preco-na-nasu-skolu',                           'why-our-school'),
+    ('podmienky-sutaze-animofest',                    'animofest-competition-conditions'),
+    ('podmienky-sutaze-uat-fashion',                  'terms-and-conditions-of-the-uat-fashion-competition'),
+    ('podmienky-sutaze-uat-film',                     'conditions-of-the-uat-film-competition'),
+    ('podmienky-sutaze-uat-graphic',                  'terms-of-the-uat-graphic-competition'),
+    ('podmienky-sutaze-uat-photo',                    'conditions-of-the-uat-photo-competition'),
+    ('akademia-filmovej-tvorby-a-multimedii',         'academy-of-filmmaking-and-multimedia'),
+    ('animovana-tvorba-8630-q',                       'animation-8630-q'),
+    ('amsterdam-2362014',                             'amsterdam-236-2014'),
+    ('motion-capture-studio',                         '3d-animation-and-motion-capture-studio'),
+    ('maturity-skolsky-rok-20252026',                 'graduation-school-year-20232024')
+),
+parovani AS (
+    SELECT sk.id AS sk_id, en.id AS en_id
+    FROM dvojice d
+    JOIN pages sk ON sk.locale = 'sk' AND sk.slug = d.sk_slug
+    JOIN pages en ON en.locale = 'en' AND en.slug = d.en_slug
+)
+INSERT INTO pages_localizations_links (page_id, inv_page_id)
+SELECT sk_id, en_id FROM parovani
+UNION ALL
+SELECT en_id, sk_id FROM parovani
+ON CONFLICT DO NOTHING;
+"
+
 prehled() {
     log_step "Stav vazeb"
     db -c "
@@ -114,6 +150,25 @@ SELECT sk.code,
          WHERE en.locale='en' AND en.code=sk.code
          ORDER BY en.published_at DESC NULLS LAST, en.id DESC LIMIT 1) AS en_nazev
 FROM field_of_studies sk WHERE sk.locale='sk' ORDER BY sk.code;"
+
+    log_info "Stránky (podle vyjmenovaných dvojic):"
+    db -t -c "
+SELECT count(*) || ' dvojic'
+FROM pages sk JOIN pages en ON en.locale='en'
+WHERE sk.locale='sk' AND (sk.slug, en.slug) IN (
+    ('talentove-skusky','talent-exam'),
+    ('kronika','chronicles'),
+    ('preco-na-nasu-skolu','why-our-school'),
+    ('podmienky-sutaze-animofest','animofest-competition-conditions'),
+    ('podmienky-sutaze-uat-fashion','terms-and-conditions-of-the-uat-fashion-competition'),
+    ('podmienky-sutaze-uat-film','conditions-of-the-uat-film-competition'),
+    ('podmienky-sutaze-uat-graphic','terms-of-the-uat-graphic-competition'),
+    ('podmienky-sutaze-uat-photo','conditions-of-the-uat-photo-competition'),
+    ('akademia-filmovej-tvorby-a-multimedii','academy-of-filmmaking-and-multimedia'),
+    ('animovana-tvorba-8630-q','animation-8630-q'),
+    ('amsterdam-2362014','amsterdam-236-2014'),
+    ('motion-capture-studio','3d-animation-and-motion-capture-studio'),
+    ('maturity-skolsky-rok-20252026','graduation-school-year-20232024'));"
 
     log_info "Pedagogové (podle jména):"
     db -t -c "
@@ -142,13 +197,14 @@ main() {
     log_step "Zápis vazeb"
 
     # Obojí v jedné transakci: buď projde všechno, nebo nic.
-    printf 'BEGIN;\n%s\n%s\nCOMMIT;\n' "$SQL_STUDIES" "$SQL_TEACHERS" | db
+    printf 'BEGIN;\n%s\n%s\n%s\nCOMMIT;\n' \
+        "$SQL_STUDIES" "$SQL_TEACHERS" "$SQL_PAGES" | db
 
     prehled
 
     log_step "Hotovo"
-    log_warn "Stránky, novinky a akce se spárovat nedaly — přeložené slugy"
-    log_warn "a názvy nemají společný klíč. Propojte je ručně v administraci."
+    log_warn "Novinky a akce spárované nejsou — překladů je málo a názvy"
+    log_warn "nemají společný klíč. Propojte je ručně v administraci."
     log_info "Restartujte backend, aby se změna projevila: ./scripts/deploy.sh --$ENVIRONMENT --backend"
 }
 
