@@ -68,7 +68,10 @@ services:
       REVALIDATE_URL: http://frontend:3000/api/revalidate
       REVALIDATE_SECRET: ${REVALIDATE_SECRET}
       STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE: sk
+      # Překlad obsahu v editoru. Model se dá přepsat, aniž by se
+      # sahalo do kódu — Google starší verze postupně odstavuje.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
     volumes:
       - ${DATA_DIR}/uploads:/opt/app/public/uploads
     ports:
